@@ -15,12 +15,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r service/requirements.txt
 
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
       - name: Software Composition Analysis - Snyk dependency scan
-        uses: snyk/actions/python@master
+        working-directory: service
+        run: snyk test --file=requirements.txt --package-manager=pip
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --file=service/requirements.txt
         continue-on-error: true
 
   owasp-zap-dast-vulnerability-check:
