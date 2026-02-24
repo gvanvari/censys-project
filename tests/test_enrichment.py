@@ -4,7 +4,6 @@ Tests for the enrichment plugins.
 Focus: plugin output validity and plugin interface contract.
 """
 
-import pytest
 from enrichment.geo_ip import GeoIPPlugin, _random_public_ip
 from enrichment.tor_classifier import _MOCK_TOR_EXIT_NODES, TORClassifierPlugin
 
