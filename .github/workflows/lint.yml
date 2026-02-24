@@ -1,0 +1,31 @@
+name: Lint
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install lint dependencies
+        run: |
+          pip install black isort pylint
+          pip install -r service/requirements.txt
+
+      - name: black
+        run: black --check service/ tests/
+
+      - name: isort
+        run: isort --check --profile black service/ tests/
+
+      - name: pylint
+        run: pylint service/ --fail-under=8.0 --recursive=yes

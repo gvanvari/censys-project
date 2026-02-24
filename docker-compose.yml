@@ -1,0 +1,35 @@
+services:
+  alert_simulator_api:
+    build: ./alert_simulator_api
+    container_name: alert_simulator_api
+    environment:
+      - MOCK_FAILURE_RATE=${MOCK_FAILURE_RATE:-0.20}
+      - MOCK_PORT=9000
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  censys_service:
+    build: ./service
+    container_name: censys_service
+    depends_on:
+      alert_simulator_api:
+        condition: service_healthy
+    environment:
+      - UPSTREAM_URL=http://alert_simulator_api:9000
+      - SYNC_INTERVAL_SECONDS=${SYNC_INTERVAL_SECONDS:-60}
+      - DB_PATH=/data/alerts.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEFAULT_LOOKBACK_HOURS=${DEFAULT_LOOKBACK_HOURS:-24}
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/data
+
+volumes:
+  db_data:

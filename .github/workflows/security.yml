@@ -1,0 +1,48 @@
+name: Security vulnerabilities check
+on: push
+
+jobs:
+  snyk-software-composition-analysis-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out latest code on the runner
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install -r service/requirements.txt
+
+      - name: Software Composition Analysis - Snyk dependency scan
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --file=service/requirements.txt
+        continue-on-error: true
+
+  owasp-zap-dast-vulnerability-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out latest code on the runner
+        uses: actions/checkout@v4
+
+      - name: Start services with Docker Compose
+        run: docker compose up -d --build
+
+      - name: Wait for service to be ready
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 2
+          done
+
+      - name: Dynamic App Security Testing - OWASP ZAP vulnerability scan
+        uses: zaproxy/action-baseline@v0.9.0
+        with:
+          target: "http://localhost:8000"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a"
+        continue-on-error: true
