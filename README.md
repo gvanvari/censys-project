@@ -172,25 +172,6 @@ censys-proj/
 
 ---
 
-## Running Tests
-
-```bash
-# Install dependencies
-pip install -r service/requirements.txt
-pip install -r tests/requirements.txt
-
-# Run all tests with coverage
-cd tests
-pytest --cov=../service --cov-report=term-missing
-
-# Run a specific test file
-pytest test_enrichment.py -v
-pytest test_fetcher.py -v
-pytest test_api.py -v
-```
-
----
-
 ## CI/CD Pipeline
 
 Three GitHub Actions workflows run on every push and pull request:
@@ -202,65 +183,3 @@ Three GitHub Actions workflows run on every push and pull request:
 | `security.yml` | Push/PR to `main` | Snyk dependency scan + OWASP ZAP DAST scan                  |
 
 **Note:** The `SNYK_TOKEN` secret must be added to the GitHub repository secrets for the Snyk scan to run.
-
----
-
-## Architecture Decisions
-
-### Database: SQLite
-
-SQLite was chosen over PostgreSQL for this scope because:
-
-- Zero operational overhead — no separate container or process to manage
-- Full SQL support with proper schema, indexes, and constraints
-- Ships with Python stdlib — no additional dependency
-- The DAO pattern (`storage/alert_dao.py`) abstracts all SQL, so migrating to PostgreSQL for a multi-instance production deployment requires only a connection string change and swapping `sqlite3` for `psycopg2`
-
-### Retry Strategy: tenacity with exponential backoff + jitter
-
-`tenacity` was used instead of manual retry logic — it's the industry-standard library and avoids reinventing a well-tested wheel. The retry policy:
-
-- Up to 3 attempts
-- Exponential backoff: 1s → 2s → 4s with jitter
-- Retries on 5xx and network errors only — 4xx errors indicate a client bug and are not retried
-
-**Next step:** A circuit breaker (e.g., `pybreaker`) would prevent indefinite retry storms during sustained outages by opening the circuit after N consecutive failures.
-
-### Enrichment: Plugin Architecture
-
-Enrichment is implemented as a plugin system with an abstract base class. Adding a new enrichment source (e.g., WHOIS, ASN lookup) means creating one new file that implements `EnrichmentPlugin.enrich()`. Nothing else changes — the pipeline calls all plugins in sequence without knowing their internals.
-
-Current plugins:
-
-1. **GeoIP** — Randomized public IP (production: MaxMind GeoLite2 or ipwhois)
-2. **TOR Classifier** — Checks IP against a simulated Tor exit node list (production: `check.torproject.org/torbulkexitlist`, refreshed and cached every few hours)
-
-### Concurrency: asyncio.Lock
-
-An `asyncio.Lock` prevents two syncs from running simultaneously (scheduler fires while `POST /sync` is in progress). This is sufficient for a single-process deployment. In a multi-instance deployment, this would be replaced with a distributed lock (Redis SETNX) or a dedicated job queue.
-
-### `/health` Does Not Call Upstream
-
-Health checks are polled frequently by load balancers and monitoring systems. Calling the upstream API in `/health` would:
-
-- Inflate upstream rate limits
-- Cause false "down" reports when upstream is slow but our service is healthy
-- Add latency to every health check
-
-Upstream reachability is instead reflected by `last_sync_status` — captured during actual sync attempts, not on every health poll.
-
-### Idempotent Ingestion
-
-Alerts are inserted with `INSERT OR IGNORE` using `UNIQUE(source, created_at)` as the natural dedup key. This means:
-
-- Re-fetching overlapping time windows (e.g., after a restart) never creates duplicate rows
-- The service guarantees **at-least-once delivery** with **idempotent storage** — the practical equivalent of exactly-once for this use case
-
-### Event Time vs Ingestion Time
-
-Each stored alert has two timestamps:
-
-- `created_at` — when the event happened in the source system (security timeline)
-- `ingested_at` — when our service stored it (pipeline monitoring, "are we falling behind?")
-
-This two-timestamp pattern is standard across the industry (Splunk: `_time` vs `_indextime`, QRadar: `startTime` vs indexing timestamp).
