@@ -47,7 +47,8 @@ def list_alerts(
         limit=limit,
         offset=offset,
     )
-    return AlertListResponse(total=total, limit=limit, offset=offset, alerts=alerts)
+    has_more = (offset + len(alerts)) < total
+    return AlertListResponse(total=total, limit=limit, offset=offset, has_more=has_more, alerts=alerts)
 
 
 @router.post("/sync", response_model=SyncResponse, status_code=202)
