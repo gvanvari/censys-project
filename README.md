@@ -7,10 +7,6 @@ A Python service that periodically fetches alerts from an upstream SIEM aggregat
 ## Quick Start
 
 ```bash
-# Clone and run
-git clone <repo-url>
-cd censys-proj
-
 # Copy environment config (defaults work out of the box)
 cp .env.example .env
 
@@ -18,8 +14,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The service is available at **http://localhost:8000**  
-The mock upstream API is available at **http://localhost:9000**
+The Censys service is available at **http://localhost:8000**
+
+The Mock Alert Simulator upstream API is available at **http://localhost:9000**
 
 Auto-generated API docs: **http://localhost:8000/docs**
 
@@ -27,29 +24,35 @@ Auto-generated API docs: **http://localhost:8000/docs**
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    Docker Compose Network                     │
-│                                                              │
-│  ┌──────────────────┐          ┌───────────────────────┐    │
-│  │   alert_simulator_api │          │   censys_service       │    │
-│  │   (Flask :9000)  │◄─────────│                       │    │
-│  │                  │  HTTP    │  APScheduler           │    │
-│  │  GET /alerts     │  GET     │      │                 │    │
-│  │                  │          │  Fetcher + tenacity    │    │
-│  │  ~20% random     │          │      │                 │    │
-│  │  500 failures    │          │  Enrichment plugins    │    │
-│  └──────────────────┘          │      │                 │    │
-│                                │  Alert DAO             │    │
-│                                │      │                 │    │
-│                                │  SQLite (volume)       │    │
-│                                │                       │    │
-│                                │  FastAPI :8000         │    │
-│                                │  GET  /alerts          │    │
-│                                │  POST /sync            │    │
-│                                │  GET  /health          │    │
-│                                └───────────────────────┘    │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph compose["Docker Compose Network"]
+        subgraph mock["alert_simulator_api  (Flask :9000)"]
+            M["GET /alerts\n~20% random 500s"]
+        end
+
+        subgraph svc["censys_service  (FastAPI :8000)"]
+            direction TB
+            SCHED["APScheduler\n(periodic)"]
+            MANUAL["POST /sync"]
+            FETCH["Fetcher\n+ tenacity retry"]
+            PIPE["Pipeline"]
+            ENRICH["Enrichment plugins\nGeoIP · TOR classifier"]
+            REPO["Alert Repository"]
+            DB[("SQLite\n(volume)")]
+            READ["GET /alerts\nGET /health"]
+
+            SCHED --> FETCH
+            MANUAL --> FETCH
+            FETCH --> PIPE
+            PIPE --> ENRICH
+            ENRICH --> REPO
+            REPO --> DB
+            READ --> REPO
+        end
+
+        FETCH -->|"HTTP GET"| M
+    end
 ```
 
 ---
@@ -152,13 +155,12 @@ censys-proj/
 │   │   ├── geo_ip.py       # GeoIP plugin
 │   │   └── tor_classifier.py  # TOR exit node plugin
 │   └── storage/
-│       ├── database.py     # SQLite init, connection
-│       └── alert_dao.py    # All DB read/write (DAO pattern)
+│       ├── database.py          # SQLite init, connection
+│       ├── alert_queries.py     # Raw SQL only
+│       └── alert_repository.py # Orchestration: filters, model mapping
 │
 ├── tests/
-│   ├── test_enrichment.py
-│   ├── test_fetcher.py
-│   └── test_api.py
+│   └── test_enrichment.py
 │
 ├── .github/workflows/
 │   ├── lint.yml            # black, isort, pylint
@@ -176,10 +178,10 @@ censys-proj/
 
 Three GitHub Actions workflows run on every push and pull request:
 
-| Workflow       | Trigger           | Checks                                                      |
-| -------------- | ----------------- | ----------------------------------------------------------- |
-| `lint.yml`     | Every push/PR     | `black --check`, `isort --check`, `pylint --fail-under=8.0` |
-| `test.yml`     | Every push/PR     | `pytest` with 75% coverage threshold                        |
-| `security.yml` | Push/PR to `main` | Snyk dependency scan + OWASP ZAP DAST scan                  |
+| Workflow       | Trigger       | Checks                                                     |
+| -------------- | ------------- | ---------------------------------------------------------- |
+| `lint.yml`     | Every push/PR | `black --check`, `isort --check`, `flake8` (separate jobs) |
+| `test.yml`     | Every push/PR | `pytest` with 100% coverage on enrichment module           |
+| `security.yml` | Every push    | Snyk dependency scan + OWASP ZAP DAST scan                 |
 
 **Note:** The `SNYK_TOKEN` secret must be added to the GitHub repository secrets for the Snyk scan to run.
