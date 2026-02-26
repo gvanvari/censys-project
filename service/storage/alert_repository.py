@@ -32,7 +32,7 @@ def _build_filters(
         params.append(severity.value)
     if source is not None:
         conditions.append("source = ?")
-        params.append(source)
+        params.append(source.lower())
     if enrichment_type:
         conditions.append("enrichment_type = ?")
         params.append(enrichment_type.value)
