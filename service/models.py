@@ -63,6 +63,7 @@ class AlertListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+    has_more: bool
     alerts: List[StoredAlert]
 
 
