@@ -30,15 +30,22 @@ def _build_filters(
     if severity:
         conditions.append("severity = ?")
         params.append(severity.value)
-    if source:
+    if source is not None:
         conditions.append("source = ?")
         params.append(source)
     if enrichment_type:
         conditions.append("enrichment_type = ?")
         params.append(enrichment_type.value)
     if since:
+        # Normalise to UTC before comparison. SQLite stores timestamps as
+        # plain strings ending in "Z" (e.g. "2026-02-26T02:40:03Z"), so the
+        # WHERE clause is a lexicographic comparison. Passing a non-UTC offset
+        # like "+05:00" would compare character-by-character against "Z"
+        # strings and produce wrong results. Converting to UTC first ensures
+        # the strings are always in the same format and sort correctly.
+        since_utc = since.astimezone(timezone.utc).replace(tzinfo=None)
         conditions.append("created_at >= ?")
-        params.append(since.isoformat())
+        params.append(since_utc.isoformat() + "Z")
 
     return conditions, params
 
