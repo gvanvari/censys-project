@@ -25,34 +25,20 @@ Auto-generated API docs: **http://localhost:8000/docs**
 ## Architecture
 
 ```mermaid
-graph LR
-    subgraph compose["Docker Compose Network"]
-        subgraph mock["alert_simulator_api  (Flask :9000)"]
-            M["GET /alerts\n~20% random 500s"]
-        end
+flowchart LR
+    M["alert_simulator_api\nFlask :9000\nGET /alerts\n~20% random 500s"]
 
-        subgraph svc["censys_service  (FastAPI :8000)"]
-            direction TB
-            SCHED["APScheduler\n(periodic)"]
-            MANUAL["POST /sync"]
-            FETCH["Fetcher\n+ tenacity retry"]
-            PIPE["Pipeline"]
-            ENRICH["Enrichment plugins\nGeoIP · TOR classifier"]
-            REPO["Alert Repository"]
-            DB[("SQLite\n(volume)")]
-            READ["GET /alerts\nGET /health"]
-
-            SCHED --> FETCH
-            MANUAL --> FETCH
-            FETCH --> PIPE
-            PIPE --> ENRICH
-            ENRICH --> REPO
-            REPO --> DB
-            READ --> REPO
-        end
-
-        FETCH -->|"HTTP GET"| M
+    subgraph svc["censys_service  —  FastAPI :8000"]
+        SCHED["APScheduler"] --> FETCH
+        MANUAL["POST /sync"] --> FETCH
+        FETCH["Fetcher + retry"] --> PIPE["Pipeline"]
+        PIPE --> ENRICH["GeoIP / TOR enrichment"]
+        ENRICH --> REPO["Alert Repository"]
+        REPO --> DB[("SQLite")]
+        READ["GET /alerts / GET /health"] --> REPO
     end
+
+    FETCH -->|HTTP GET| M
 ```
 
 ---
