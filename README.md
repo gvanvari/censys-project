@@ -26,16 +26,16 @@ Auto-generated API docs: **http://localhost:8000/docs**
 
 ```mermaid
 flowchart LR
-    M["alert_simulator_api\nFlask :9000\nGET /alerts\n~20% random 500s"]
+    M["alert_simulator_api (Flask :9000)"]
 
-    subgraph svc["censys_service  —  FastAPI :8000"]
+    subgraph svc["censys_service (FastAPI :8000)"]
         SCHED["APScheduler"] --> FETCH
         MANUAL["POST /sync"] --> FETCH
         FETCH["Fetcher + retry"] --> PIPE["Pipeline"]
-        PIPE --> ENRICH["GeoIP / TOR enrichment"]
+        PIPE --> ENRICH["GeoIP + TOR enrichment"]
         ENRICH --> REPO["Alert Repository"]
         REPO --> DB[("SQLite")]
-        READ["GET /alerts / GET /health"] --> REPO
+        READ["GET /alerts, GET /health"] --> REPO
     end
 
     FETCH -->|HTTP GET| M
