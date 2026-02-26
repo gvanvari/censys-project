@@ -15,32 +15,10 @@ Simulation approach:
 """
 
 from enrichment.base import EnrichmentPlugin
+from enrichment.sim_constants import MOCK_TOR_EXIT_NODES
 
-# Simulates a cached TOR exit node list fetched from check.torproject.org
-_MOCK_TOR_EXIT_NODES: frozenset = frozenset(
-    {
-        "185.220.101.35",
-        "185.220.101.47",
-        "104.244.72.115",
-        "199.87.154.255",
-        "162.247.74.27",
-        "176.10.104.240",
-        "51.15.43.205",
-        "45.33.32.156",
-        "23.129.64.131",
-        "204.13.164.118",
-        "171.25.193.77",
-        "94.230.208.147",
-        "77.247.181.163",
-        "193.11.114.43",
-        "37.187.129.166",
-        "217.170.205.14",
-        "80.67.172.162",
-        "195.176.3.19",
-        "109.70.100.28",
-        "46.165.230.5",
-    }
-)
+# Alias kept for backward compatibility (tests import _MOCK_TOR_EXIT_NODES)
+_MOCK_TOR_EXIT_NODES = MOCK_TOR_EXIT_NODES
 
 
 class TORClassifierPlugin(EnrichmentPlugin):

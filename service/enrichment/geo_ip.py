@@ -17,6 +17,10 @@ Why public IPs only:
 import random
 
 from enrichment.base import EnrichmentPlugin
+from enrichment.sim_constants import _TOR_IP_LIST
+
+# Probability that a simulated alert's IP is a known TOR exit node.
+_TOR_HIT_RATE: float = 0.25
 
 # RFC1918 private ranges to exclude from random generation
 _PRIVATE_PREFIXES = (
@@ -44,7 +48,13 @@ _PRIVATE_PREFIXES = (
 
 
 def _random_public_ip() -> str:
-    """Generate a random public IPv4 address, excluding RFC1918 ranges."""
+    """Generate a random public IPv4 address, excluding RFC1918 ranges.
+
+    With probability _TOR_HIT_RATE, returns a known TOR exit node IP so that
+    the downstream TORClassifierPlugin produces realistic tor_exit_node labels.
+    """
+    if random.random() < _TOR_HIT_RATE:
+        return random.choice(_TOR_IP_LIST)
     while True:
         ip = ".".join(str(random.randint(1, 254)) for _ in range(4))
         if not any(ip.startswith(prefix) for prefix in _PRIVATE_PREFIXES):
