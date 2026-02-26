@@ -18,7 +18,15 @@ The Censys service is available at **http://localhost:8000**
 
 The Mock Alert Simulator upstream API is available at **http://localhost:9000**
 
-Auto-generated API docs: **http://localhost:8000/docs**
+Auto-generated API docs (Swagger UI): **http://localhost:8000/docs**
+
+> **Tip — `POST /sync`:**
+> To trigger a manual sync, either use **Swagger UI** (`/docs` → `POST /sync` → Try it out → Execute)
+> or run:
+>
+> ```bash
+> curl -X POST http://localhost:8000/sync
+> ```
 
 ---
 
